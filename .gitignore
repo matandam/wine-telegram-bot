@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+data/wine_bot.db
+data/wine_bot.db-shm
+data/wine_bot.db-wal
+*.js.map
+.DS_Store
