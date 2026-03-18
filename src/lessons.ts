@@ -139,28 +139,42 @@ function splitMessage(text: string, maxLen: number): string[] {
 
 // ─── Short Card Prompt ─────────────────────────────────────────────────────
 
-const WINE_CARD_PROMPT = `You are a WSET-certified sommelier writing a concise wine snapshot card.
-Write ONLY in this exact format, no extra text:
+const WINE_CARD_PROMPT = `You are a WSET Level 3 certified sommelier writing a structured tasting note using the WSET Systematic Approach to Tasting Wine (SAT). Write ONLY in this exact format — no extra text, no markdown, plain text only:
 
-[One sentence hook — sharp and opinionated, not poetic]
+[One sharp, opinionated hook sentence about this wine — not poetic, just honest and specific]
 
 👁 APPEARANCE
-[1 sentence: colour and clarity]
+Clarity: [clear / hazy]
+Intensity: [pale / medium / deep]
+Colour: [choose from: lemon-green / lemon / gold / amber / brown for white; pink / salmon / orange for rosé; purple / ruby / garnet / tawny / brown for red]
 
 👃 NOSE
-[1 sentence: 3-4 specific aromas]
+Condition: [clean / unclean]
+Intensity: [light / medium- / medium / medium+ / pronounced]
+Aromas: [list 4-6 specific aroma descriptors — primary, secondary and tertiary where relevant]
+Development: [youthful / developing / fully developed]
 
 👅 PALATE
-Body: [light/medium/full] · Acidity: [low/medium/high] · Tannin: [low/medium/high] · Alcohol: [low/medium/high]
-[1 sentence: dominant flavours and finish]
+Sweetness: [dry / off-dry / medium-dry / medium-sweet / sweet / luscious]
+Acidity: [low / medium- / medium / medium+ / high]
+Tannin: [low / medium- / medium / medium+ / high] (omit for whites/rosés)
+Alcohol: [low / medium / high]
+Body: [light / medium- / medium / medium+ / full]
+Flavour intensity: [light / medium- / medium / medium+ / pronounced]
+Flavours: [list 4-6 specific flavour descriptors]
+Finish: [short / medium- / medium / medium+ / long]
+
+✅ CONCLUSIONS
+Quality: [faulty / poor / acceptable / good / very good / outstanding]
+Readiness: [needs time / ready to drink / drink soon / past its best]
 
 🍽 PAIRS WITH
-[3-4 specific foods, comma separated]
+[3-4 specific dishes, comma separated]
 
 🎉 BEST FOR
-[1 sentence: occasion or setting]
+[1 sentence: occasion or moment this wine suits]
 
-Keep the whole card under 300 words. Plain text only — no markdown.`;
+Keep the whole card under 400 words.`;
 
 /** Generate a short WSET-style wine card (one Telegram message) */
 export async function generateWineCard(regionName: string): Promise<string> {
