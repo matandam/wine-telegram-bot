@@ -59,6 +59,7 @@ function fetchMapImage(lat: number, lon: number, zoom: number): Promise<Buffer> 
     `&z=${zoom}` +
     `&l=map` +
     `&size=640,400` +
+    `&lang=en_US` +
     `&pt=${lon},${lat},pm2rdm`;
 
   return fetchBuffer(url);
