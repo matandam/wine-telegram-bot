@@ -8,7 +8,7 @@ import { handleStart } from './commands/start';
 import { handleHelp } from './commands/help';
 import { handleDaily, handleTimezoneReply } from './commands/daily';
 import { handleStop } from './commands/stop';
-import { handleLesson } from './commands/lesson';
+import { handleLesson, handleFullLessonCallback } from './commands/lesson';
 import { handleRegion } from './commands/region';
 import { handleGrape } from './commands/grape';
 import { handleRecommend, handleRecommendReply } from './commands/recommend';
@@ -126,6 +126,16 @@ bot.on('message', async (msg) => {
     msg.chat.id,
     '🍷 I am a wine education bot. Use /help to see what I can do.'
   );
+});
+
+// ─── Inline button callbacks ───────────────────────────────────────────────
+
+bot.on('callback_query', async (query) => {
+  if (query.data?.startsWith('full_lesson:')) {
+    await handleFullLessonCallback(bot, query);
+  } else {
+    await bot.answerCallbackQuery(query.id);
+  }
 });
 
 // ─── Error handling ────────────────────────────────────────────────────────

@@ -137,6 +137,53 @@ function splitMessage(text: string, maxLen: number): string[] {
   return parts.filter(p => p.length > 0);
 }
 
+// ─── Short Card Prompt ─────────────────────────────────────────────────────
+
+const WINE_CARD_PROMPT = `You are a WSET-certified sommelier writing a concise wine snapshot card.
+Write ONLY in this exact format, no extra text:
+
+[One sentence hook — sharp and opinionated, not poetic]
+
+👁 APPEARANCE
+[1 sentence: colour and clarity]
+
+👃 NOSE
+[1 sentence: 3-4 specific aromas]
+
+👅 PALATE
+Body: [light/medium/full] · Acidity: [low/medium/high] · Tannin: [low/medium/high] · Alcohol: [low/medium/high]
+[1 sentence: dominant flavours and finish]
+
+🍽 PAIRS WITH
+[3-4 specific foods, comma separated]
+
+🎉 BEST FOR
+[1 sentence: occasion or setting]
+
+Keep the whole card under 300 words. Plain text only — no markdown.`;
+
+/** Generate a short WSET-style wine card (one Telegram message) */
+export async function generateWineCard(regionName: string): Promise<string> {
+  const message = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 500,
+    system: WINE_CARD_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: `Write a wine snapshot card for the ${regionName} wine region and its signature wine style.`,
+      },
+    ],
+  });
+
+  const raw = message.content
+    .filter(b => b.type === 'text')
+    .map(b => (b as { type: 'text'; text: string }).text)
+    .join('');
+
+  return `🍷 <b>${escapeHtml(regionName)}</b>\n─────────────────────\n\n${escapeHtml(raw.trim())}`;
+}
+
 // ─── Public API ────────────────────────────────────────────────────────────
 
 /** Generate a deep-dive lesson for a wine region */
