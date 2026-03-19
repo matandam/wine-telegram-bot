@@ -4,6 +4,7 @@ import { getUser, updateUserSubscription, updateUserTimezone, setUserState, clea
 // Common timezones displayed as friendly labels → IANA names
 export const COMMON_TIMEZONES: Record<string, string> = {
   'UTC': 'UTC',
+  'Israel / Jerusalem': 'Asia/Jerusalem',
   'New York (EST/EDT)': 'America/New_York',
   'Chicago (CST/CDT)': 'America/Chicago',
   'Denver (MST/MDT)': 'America/Denver',
@@ -12,6 +13,7 @@ export const COMMON_TIMEZONES: Record<string, string> = {
   'Paris / Berlin (CET/CEST)': 'Europe/Paris',
   'Helsinki / Kyiv (EET)': 'Europe/Helsinki',
   'Moscow (MSK)': 'Europe/Moscow',
+  'Tel Aviv / Beirut': 'Asia/Jerusalem',
   'Dubai (GST)': 'Asia/Dubai',
   'Mumbai (IST)': 'Asia/Kolkata',
   'Bangkok (ICT)': 'Asia/Bangkok',

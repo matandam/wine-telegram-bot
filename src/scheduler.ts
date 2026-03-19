@@ -43,8 +43,8 @@ export function initScheduler(bot: TelegramBot): void {
       try {
         const { hour, minute } = getTimeInTimezone(user.timezone || 'UTC');
 
-        // Deliver at 9:00 AM in the user's timezone
-        if (hour !== 9 || minute !== 0) continue;
+        // Deliver between 9:00–9:05 AM in the user's timezone (5-min window survives restarts)
+        if (hour !== 9 || minute > 5) continue;
 
         // Guard against double delivery within 20 hours
         if (hasRecentLesson(user.telegram_id, 20)) {
