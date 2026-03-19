@@ -10,6 +10,10 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
+console.log(`[db] Using database at: ${DB_PATH}`);
+console.log(`[db] __dirname: ${__dirname}`);
+console.log(`[db] DB_PATH env: ${process.env.DB_PATH || '(not set)'}`);
+
 const db: DatabaseType = new Database(DB_PATH);
 
 // Enable WAL mode for better performance
