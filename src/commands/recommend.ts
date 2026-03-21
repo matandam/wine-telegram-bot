@@ -182,10 +182,10 @@ export async function handleRecommendCallback(
 
   if (data.startsWith('rec_different:')) {
     await bot.answerCallbackQuery(query.id, { text: 'Finding something different…' });
-    const parts = data.split(':');
-    // Format: rec_different:<telegramId>:<color>|||<style>|||<occasion>
-    const prefsStr = parts.slice(2).join(':');
-    const prefs = decodePrefs(prefsStr);
+    // Format: rec_different:<telegramId>:<3-digit-encoded-prefs>
+    const [, telegramIdPart, prefsStr] = data.split(':');
+    const telegramId = telegramIdPart ?? String(query.from.id);
+    const prefs = decodePrefs(prefsStr ?? '430');
 
     await bot.sendChatAction(chatId, 'typing');
     let result: string[];
@@ -198,7 +198,6 @@ export async function handleRecommendCallback(
     }
 
     const prefsEncoded = encodePrefs(prefs.color, prefs.style, prefs.occasion);
-    const telegramId = parts[1] ?? String(query.from.id);
     for (let i = 0; i < result.length; i++) {
       const isLast = i === result.length - 1;
       await bot.sendMessage(chatId, result[i], {
@@ -219,14 +218,23 @@ export async function handleRecommendCallback(
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-/** Encode prefs for callback_data (max 64 bytes in Telegram). Uses ||| separator. */
+/** Encode prefs as 3 digits (array indices) to stay well under Telegram's 64-byte callback_data limit. */
 function encodePrefs(color: string, style: string, occasion: string): string {
-  return `${color}|||${style}|||${occasion}`;
+  const c = COLOR_OPTIONS.indexOf(color);
+  const s = STYLE_OPTIONS.indexOf(style);
+  const o = OCCASION_OPTIONS.indexOf(occasion);
+  return `${c < 0 ? 4 : c}${s < 0 ? 3 : s}${o < 0 ? 0 : o}`;
 }
 
 function decodePrefs(encoded: string): { color: string; style: string; occasion: string } {
-  const [color = 'No preference', style = 'No preference', occasion = 'Casual'] = encoded.split('|||');
-  return { color, style, occasion };
+  const c = parseInt(encoded[0] ?? '4', 10);
+  const s = parseInt(encoded[1] ?? '3', 10);
+  const o = parseInt(encoded[2] ?? '0', 10);
+  return {
+    color:   COLOR_OPTIONS[c]   ?? 'No preference',
+    style:   STYLE_OPTIONS[s]   ?? 'No preference',
+    occasion: OCCASION_OPTIONS[o] ?? 'Casual weeknight',
+  };
 }
 
 function buildKeyboard(options: string[]): TelegramBot.ReplyKeyboardMarkup {
