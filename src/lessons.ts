@@ -409,8 +409,8 @@ function formatRecommendationBody(raw: string): string {
       const bottleMatch = line.match(/^(💚|💛|🔴)\s+(.+)$/);
       if (bottleMatch) {
         const [, emoji, wineName] = bottleMatch;
-        const searchQuery = encodeURIComponent(wineName.replace(' — ', ' '));
-        const url = `https://www.vivino.com/search/wines?q=${searchQuery}`;
+        const searchQuery = encodeURIComponent(wineName.replace(' — ', ' ') + ' wine buy');
+        const url = `https://www.google.com/search?q=${searchQuery}`;
         return `${emoji} <a href="${url}">${escapeHtml(wineName)}</a>`;
       }
       return escapeHtml(line);
