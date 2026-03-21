@@ -395,6 +395,29 @@ export async function generateBonusLesson(title: string, description: string, ca
   return formatLessonForTelegram(raw, title);
 }
 
+// ─── Recommendation Helpers ─────────────────────────────────────────────────
+
+/**
+ * Process raw recommendation text: escape HTML on all lines, but on bottle
+ * lines (starting with 💚/💛/🔴) inject a Vivino search link around the name.
+ */
+function formatRecommendationBody(raw: string): string {
+  return raw
+    .trim()
+    .split('\n')
+    .map(line => {
+      const bottleMatch = line.match(/^(💚|💛|🔴)\s+(.+)$/);
+      if (bottleMatch) {
+        const [, emoji, wineName] = bottleMatch;
+        const searchQuery = encodeURIComponent(wineName.replace(' — ', ' '));
+        const url = `https://www.vivino.com/search/wines?q=${searchQuery}`;
+        return `${emoji} <a href="${url}">${escapeHtml(wineName)}</a>`;
+      }
+      return escapeHtml(line);
+    })
+    .join('\n');
+}
+
 // ─── Recommendation Prompt ──────────────────────────────────────────────────
 
 const RECOMMENDATION_PROMPT = `You are a wine recommender who writes like Wine Folly — direct, specific, and completely unpretentious. You receive three user preferences (color, style, occasion) and output exactly 3 bottle recommendations.
@@ -460,7 +483,7 @@ export async function generateRecommendation(prefs: {
   setCachedContent(cacheKey, 'recommendation', raw);
 
   const header = `🍾 <b>Your Personalised Wine Recommendation</b>\n─────────────────────\n\n`;
-  const body = escapeHtml(raw.trim());
+  const body = formatRecommendationBody(raw);
   return splitMessage(header + body, 4000);
 }
 
@@ -490,6 +513,6 @@ export async function generateFreshRecommendation(prefs: {
     .join('');
 
   const header = `🍾 <b>Your Personalised Wine Recommendation</b>\n─────────────────────\n\n`;
-  const body = escapeHtml(raw.trim());
+  const body = formatRecommendationBody(raw);
   return splitMessage(header + body, 4000);
 }
