@@ -2,9 +2,9 @@ import Database, { Database as DatabaseType } from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-// Prefer /app/data on Railway (volume mount), fall back to local data/
-const DEFAULT_PATH = fs.existsSync('/app/data')
-  ? '/app/data/wine_bot.db'
+// Prefer /app/db on Fly.io (volume mount), fall back to local data/
+const DEFAULT_PATH = fs.existsSync('/app/db')
+  ? '/app/db/wine_bot.db'
   : path.join(__dirname, '..', 'data', 'wine_bot.db');
 
 const DB_PATH = process.env.DB_PATH || DEFAULT_PATH;
