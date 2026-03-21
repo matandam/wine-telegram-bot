@@ -428,13 +428,15 @@ Rules:
 - Every tasting note must use plain English — no "minerality", no "terroir-driven", no "complex"
 - Real producers, real wine names that actually exist`;
 
-/** Generate a personalised wine recommendation. Cached per (color, style, occasion) combo. */
+/** Generate a personalised wine recommendation. Cached per (color, style, occasion, market) combo. */
 export async function generateRecommendation(prefs: {
   color: string;
   style: string;
   occasion: string;
+  market?: string;
 }): Promise<string[]> {
-  const cacheKey = `${prefs.color}|${prefs.style}|${prefs.occasion}`;
+  const market = prefs.market ?? 'worldwide';
+  const cacheKey = `${prefs.color}|${prefs.style}|${prefs.occasion}|${market}`;
   const cached = getCachedContent(cacheKey, 'recommendation');
   if (cached) return splitMessage(cached, 4000);
 
@@ -445,7 +447,7 @@ export async function generateRecommendation(prefs: {
     messages: [
       {
         role: 'user',
-        content: `Color: ${prefs.color}\nStyle: ${prefs.style}\nOccasion: ${prefs.occasion}`,
+        content: `Color: ${prefs.color}\nStyle: ${prefs.style}\nOccasion: ${prefs.occasion}\nMarket: ${market} (recommend bottles that are realistically available in this market)`,
       },
     ],
   });
@@ -467,7 +469,9 @@ export async function generateFreshRecommendation(prefs: {
   color: string;
   style: string;
   occasion: string;
+  market?: string;
 }): Promise<string[]> {
+  const market = prefs.market ?? 'worldwide';
   const message = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 600,
@@ -475,7 +479,7 @@ export async function generateFreshRecommendation(prefs: {
     messages: [
       {
         role: 'user',
-        content: `Color: ${prefs.color}\nStyle: ${prefs.style}\nOccasion: ${prefs.occasion}\n\nGive me different bottles from last time.`,
+        content: `Color: ${prefs.color}\nStyle: ${prefs.style}\nOccasion: ${prefs.occasion}\nMarket: ${market} (recommend bottles that are realistically available in this market)\n\nGive me different bottles from last time.`,
       },
     ],
   });

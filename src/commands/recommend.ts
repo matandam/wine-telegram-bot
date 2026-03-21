@@ -1,6 +1,23 @@
 import TelegramBot from 'node-telegram-bot-api';
-import { getUserState, setUserState, clearUserState, saveUserPreferences } from '../db';
+import { getUserState, setUserState, clearUserState, saveUserPreferences, getUser } from '../db';
 import { generateRecommendation, generateFreshRecommendation } from '../lessons';
+
+/** Derive a wine market from an IANA timezone string. */
+function marketFromTimezone(tz: string): string {
+  if (!tz || tz === 'UTC') return 'worldwide';
+  const [area, city = ''] = tz.split('/');
+  const areaLower = area.toLowerCase();
+  const cityLower = city.toLowerCase();
+
+  if (cityLower === 'jerusalem' || cityLower === 'tel_aviv') return 'Israel';
+  if (areaLower === 'america') return 'North America';
+  if (areaLower === 'europe') return 'Europe';
+  if (areaLower === 'australia') return 'Australia';
+  if (areaLower === 'asia') return 'Asia';
+  if (areaLower === 'africa') return 'Africa';
+  if (areaLower === 'pacific') return 'Oceania';
+  return 'worldwide';
+}
 
 // ─── Step definitions ──────────────────────────────────────────────────────
 
@@ -103,10 +120,14 @@ export async function handleRecommendReply(
       const answers: Record<string, string> = { ...state.answers, occasion: text };
       clearUserState(telegramId);
 
+      const userRow = getUser(telegramId);
+      const market = marketFromTimezone(userRow?.timezone ?? 'UTC');
+
       const prefs = {
         color: answers.color ?? 'No preference',
         style: answers.style ?? 'No preference',
         occasion: answers.occasion ?? 'Casual',
+        market,
       };
 
       await bot.sendMessage(
@@ -131,7 +152,7 @@ export async function handleRecommendReply(
         return;
       }
 
-      saveUserPreferences(telegramId, prefs.color, prefs.style, prefs.occasion);
+      saveUserPreferences(telegramId, prefs.color, prefs.style, prefs.occasion, prefs.market);
 
       const prefsEncoded = encodePrefs(prefs.color, prefs.style, prefs.occasion);
       for (let i = 0; i < parts.length; i++) {
@@ -185,7 +206,9 @@ export async function handleRecommendCallback(
     // Format: rec_different:<telegramId>:<3-digit-encoded-prefs>
     const [, telegramIdPart, prefsStr] = data.split(':');
     const telegramId = telegramIdPart ?? String(query.from.id);
-    const prefs = decodePrefs(prefsStr ?? '430');
+    const decodedPrefs = decodePrefs(prefsStr ?? '430');
+    const userRow = getUser(telegramId);
+    const prefs = { ...decodedPrefs, market: marketFromTimezone(userRow?.timezone ?? 'UTC') };
 
     await bot.sendChatAction(chatId, 'typing');
     let result: string[];
