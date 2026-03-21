@@ -79,6 +79,12 @@ const SECTION_EMOJI: Record<string, string> = {
   // Grape lesson variants
   'Grape Overview':             '🍇',
   'Key Growing Regions':        '🗺',
+  // Bonus lesson sections
+  'Why This Matters':           '🎯',
+  'What It Actually Is':        '📖',
+  'How It Affects Your Glass':  '🍷',
+  'The Bottom Line':            '✅',
+  'Try This':                   '🚀',
 };
 
 /**
@@ -274,6 +280,119 @@ export async function generateGrapeLesson(grapeName: string): Promise<string[]> 
 
   setCachedContent(grapeName, 'grape_lesson', raw);
   return formatLessonForTelegram(raw, `${grapeName} — Grape Deep Dive`);
+}
+
+// ─── Bonus Lesson Prompts ───────────────────────────────────────────────────
+
+const BONUS_CARD_PROMPT = `You are writing a short "Did You Know" wine education card in the Wine Folly style — clear, punchy, totally unpretentious. Plain text only, no markdown.
+
+Follow this EXACT format with NO extra text:
+
+[One punchy hook sentence. Opinionated and specific — what makes this topic genuinely interesting to a wine drinker. Not poetic.]
+
+🔑 KEY FACTS
+• [Surprising specific fact — something concrete, not vague]
+• [Something you'd tell a friend at a dinner party]
+• [The "aha" moment — the one thing that reframes how you think about this]
+• [Practical: how this directly affects what you taste or buy]
+
+📌 WHY IT MATTERS
+[One sentence any wine drinker should care about. Connect it to the glass.]
+
+Rules:
+- Under 200 words total
+- Every fact must be specific — no generalities
+- Plain text only, no bold, no markdown
+- Write for curious adults, not sommeliers`;
+
+const BONUS_LESSON_PROMPT = `You are a wine educator who writes like Wine Folly — clear, visual, and totally unpretentious. Your reader drinks wine but has never studied it. Make them feel smart.
+
+You ONLY discuss wine, wine regions, grapes, producers, terroir, winemaking, and food pairing. Nothing else.
+
+Write every lesson in this EXACT structure with these EXACT headers and NO others:
+
+## Why This Matters
+## What It Actually Is
+## How It Affects Your Glass
+## The Bottom Line
+## Try This
+
+RULES FOR EACH SECTION:
+
+1. WHY THIS MATTERS (2–3 sentences)
+   Why should someone who just wants to drink good wine care about this? Make the stakes real and personal. No academic framing.
+
+2. WHAT IT ACTUALLY IS (3–4 short paragraphs, pure prose)
+   Explain the concept plainly. No jargon without immediate translation. Use analogies from everyday life. If it's a place, locate it concretely. If it's a technique, describe what physically happens.
+
+3. HOW IT AFFECTS YOUR GLASS (2–3 paragraphs)
+   This is where concept meets palate. Translate everything into what you actually taste, smell, or see. Use specific examples — real wines, real producers, real flavour descriptions in plain English (no "mineral," no "complex," no "terroir-driven").
+
+4. THE BOTTOM LINE (1 short paragraph)
+   The one-sentence mental model they should walk away with. Make it memorable.
+
+5. TRY THIS (3–4 bullet points or short lines)
+   Concrete actions: specific bottles to buy, things to compare, questions to ask a sommelier. Real names, real wines, approachable prices.
+
+OVERALL RULES:
+- Total length: 3–4 minute read
+- Plain text only — no **bold**, no _italic_ — only ## headers exactly as shown
+- Every abstract descriptor must be translated to something the reader can picture or feel
+- No sections beyond the five listed above`;
+
+/** Generate a short bonus topic card (Did You Know format). Cached per title. */
+export async function generateBonusCard(title: string, description: string, category: string): Promise<string> {
+  const cached = getCachedContent(title, 'bonus_card');
+  if (cached) return cached;
+
+  const message = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 400,
+    system: BONUS_CARD_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: `Write a "Did You Know" wine card about: ${title}. Context: ${description}. Category: ${category}.`,
+      },
+    ],
+  });
+
+  const raw = message.content
+    .filter(b => b.type === 'text')
+    .map(b => (b as { type: 'text'; text: string }).text)
+    .join('');
+
+  const formatted = `🍾 <b>${escapeHtml(title)}</b>\n─────────────────────\n\n${escapeHtml(raw.trim())}`;
+  setCachedContent(title, 'bonus_card', formatted);
+  return formatted;
+}
+
+/** Generate a full bonus topic lesson. Cached per title. */
+export async function generateBonusLesson(title: string, description: string, category: string): Promise<string[]> {
+  const cached = getCachedContent(title, 'bonus_lesson');
+  if (cached) return formatLessonForTelegram(cached, title);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stream = anthropic.messages.stream({
+    model: MODEL,
+    max_tokens: 4096,
+    system: BONUS_LESSON_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: `Write a wine education lesson about: ${title}. Context: ${description}. Category: ${category}. Follow the required structure exactly.`,
+      },
+    ],
+  } as any);
+
+  const message = await stream.finalMessage();
+  const raw = message.content
+    .filter(b => b.type === 'text')
+    .map(b => (b as { type: 'text'; text: string }).text)
+    .join('');
+
+  setCachedContent(title, 'bonus_lesson', raw);
+  return formatLessonForTelegram(raw, title);
 }
 
 /** Generate a personalised wine style recommendation */
