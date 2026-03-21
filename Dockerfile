@@ -7,6 +7,7 @@ RUN npm ci
 
 COPY tsconfig.json ./
 COPY src ./src
+COPY data ./data
 RUN npm run build
 
 # ── Stage 2: run ────────────────────────────────────────────────────────────
