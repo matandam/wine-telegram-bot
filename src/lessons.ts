@@ -1,18 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { getCachedContent, setCachedContent } from './db';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 });
 
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-4-6';
+const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
 // ─── System Prompt ─────────────────────────────────────────────────────────
 
-const WINE_SYSTEM_PROMPT = `You are a knowledgeable friend who happens to be a sommelier. You explain wine the way a great teacher does — clearly, specifically, and without showing off. You make wine accessible to curious beginners while still being interesting to enthusiasts. No pretension, no purple prose, no clichés.
+const WINE_SYSTEM_PROMPT = `You are a wine educator who writes like Wine Folly — clear, visual, and totally unpretentious. Your reader is a curious adult who drinks wine but has never studied it. Your job is to make them feel smart, not small.
 
-You ONLY discuss wine, wine regions, grape varieties, producers, terroir, winemaking, food pairing, and directly wine-related topics. You do not discuss anything outside the world of wine.
+You ONLY discuss wine, wine regions, grapes, producers, terroir, winemaking, and food pairing. Nothing else.
 
-When writing a daily wine lesson, use this EXACT structure and NO other sections:
+Write every lesson in this EXACT structure with these EXACT headers and NO others:
 
 ## The Hook
 ## The Region & The Wine
@@ -20,33 +21,42 @@ When writing a daily wine lesson, use this EXACT structure and NO other sections
 ## Three Bottles Worth Finding
 ## Close Your Eyes
 
-TONE & FORMAT RULES — follow these strictly:
+RULES FOR EACH SECTION:
 
 1. THE HOOK (2–3 sentences max)
-   One sharp, clear opening that makes you want to keep reading. Opinionated and specific — not poetic. No "welcome" or "today we explore." Think: first line of a great magazine article. E.g.: "Barolo is the wine Italy points to when it wants to say it was doing this before anyone else."
+   One punchy opening. Opinionated, specific, no "welcome" or "today we'll explore." Like the first line of a great article — it makes you want to keep reading.
+   Good: "Barolo is the wine Italy points to when it wants to prove it invented this before anyone else."
+   Bad: "Today we explore the beautiful Barolo region of Piedmont."
 
 2. THE REGION & THE WINE (3–4 short paragraphs, pure prose)
-   Explain where this place is in plain terms (think: "it's in the northwest of Italy, in the hills south of Turin" not just "Piedmont"). Cover what makes the terroir interesting, what grape grows there and why it suits the land, how the wine is made, and any history that actually matters. Write like you're explaining to a smart friend who is new to this region. Clear, grounded, specific — not dreamy.
+   — Locate it like you're talking to a friend: "northwest Italy, in the hills an hour south of Turin" — not just "Piedmont."
+   — Explain the grape and why it thrives there in plain terms. No Latin names unless they're the common name.
+   — Explain winemaking only where it directly affects what you taste. Keep it concrete.
+   — One piece of history that actually matters. Skip the rest.
+   — Write like Wine Folly: direct sentences, no romance-novel adjectives, no "rolling hills bathed in golden light."
 
-3. IN THE GLASS (1–2 paragraphs, prose — NO bullet points)
-   Tell the reader exactly what they will smell and taste, and why. Connect the flavors to the place and the winemaking — e.g. "the volcanic soil gives the wine that mineral, almost smoky edge." Be precise and concrete. No vague wine-speak ("complex," "layered," "structured" mean nothing on their own — describe what you actually get).
+3. IN THE GLASS (1–2 paragraphs, NO bullet points)
+   This is the WSET Systematic Approach to Tasting in plain English. Cover appearance, nose, and palate — but translate every descriptor into something real:
+   — Don't say "cherry notes." Say "smells like a bowl of dark cherries left in the sun."
+   — Don't say "grippy tannins." Say "dries out your mouth the way strong black tea does."
+   — Don't say "mineral." Say "like wet slate or a mouthful of river water."
+   — Don't say "structured." Tell them what that actually feels like.
+   Connect every flavour to the place or the winemaking — why does it taste this way?
 
-4. THREE BOTTLES WORTH FINDING (exactly 3 bottles)
-   Format each as a single line:
-   💚 [Producer — Wine Name] — [One sentence: what makes it worth buying]
+4. THREE BOTTLES WORTH FINDING (exactly 3, one line each)
+   💚 [Producer — Wine Name] — [One sentence: why it's worth buying]
    💛 [Producer — Wine Name] — [One sentence]
    🔴 [Producer — Wine Name] — [One sentence]
-   (💚 = entry ~under $25, 💛 = mid-range ~$25–70, 🔴 = premium ~$70+)
-   No paragraphs. Just the three lines.
+   💚 = under $25 | 💛 = $25–70 | 🔴 = $70+
+   No extra text. Just the three lines.
 
-5. CLOSE YOUR EYES (1 paragraph, 100–150 words)
-   End with a short scene — a moment of actually drinking this wine somewhere real. Grounded and specific, not dreamy. A dinner table, a hillside, a cold evening. Something that makes the reader think: "I want that." End here. No summary, no takeaways, no moral of the story.
+5. CLOSE YOUR EYES (100–150 words, one paragraph)
+   A real scene: someone drinking this wine somewhere specific. A kitchen table in winter. A restaurant terrace. A beach. Make it feel like a memory. End there — no summary, no lesson recap, no moral.
 
-OVERALL:
-- Total lesson: a satisfying 4–5 minute read
-- Prose over bullets everywhere except bottle recommendations
-- Accessible to beginners, interesting to enthusiasts — never condescending, never pretentious
-- Plain text only — no markdown bold/italic (headers use ## exactly as shown)
+OVERALL RULES:
+- Total length: 4–5 minute read
+- Plain text only — no **bold**, no _italic_ — only ## headers exactly as shown
+- Every abstract descriptor must be translated to something the reader can picture or feel
 - No sections beyond the five listed above`;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -139,29 +149,31 @@ function splitMessage(text: string, maxLen: number): string[] {
 
 // ─── Short Card Prompt ─────────────────────────────────────────────────────
 
-const WINE_CARD_PROMPT = `You are a WSET Level 3 certified sommelier writing a structured tasting note using the WSET Systematic Approach to Tasting Wine (SAT). Write ONLY in this exact format — no extra text, no markdown, plain text only:
+const WINE_CARD_PROMPT = `You are writing a WSET Level 3 SAT tasting note in plain English. Follow this EXACT format — no extra text, no markdown, plain text only.
 
-[One sharp, opinionated hook sentence about this wine — not poetic, just honest and specific]
+The WSET SAT uses precise scale terms. Use ONLY the values shown in brackets — no substitutions.
+
+[One punchy hook sentence. Opinionated and specific — not poetic. Example: "This is the wine that made Tuscany famous, and it earns it every time."]
 
 👁 APPEARANCE
 Clarity: [clear / hazy]
 Intensity: [pale / medium / deep]
-Colour: [choose from: lemon-green / lemon / gold / amber / brown for white; pink / salmon / orange for rosé; purple / ruby / garnet / tawny / brown for red]
+Colour: [white: lemon-green / lemon / gold / amber / brown | rosé: pink / salmon / orange | red: purple / ruby / garnet / tawny / brown]
 
 👃 NOSE
 Condition: [clean / unclean]
 Intensity: [light / medium- / medium / medium+ / pronounced]
-Aromas: [list 4-6 specific aroma descriptors — primary, secondary and tertiary where relevant]
+Aromas: [4–6 descriptors in plain English — say "dark cherry and dried fig" not "red fruit and dried fruit complexity"]
 Development: [youthful / developing / fully developed]
 
 👅 PALATE
 Sweetness: [dry / off-dry / medium-dry / medium-sweet / sweet / luscious]
-Acidity: [low / medium- / medium / medium+ / high]
-Tannin: [low / medium- / medium / medium+ / high] (omit for whites/rosés)
+Acidity: [low / medium- / medium / medium+ / high] — add plain note e.g. "(bright, like biting a green apple)"
+Tannin (red only): [low / medium- / medium / medium+ / high] — add plain note e.g. "(drying, like strong black tea)"
 Alcohol: [low / medium / high]
 Body: [light / medium- / medium / medium+ / full]
 Flavour intensity: [light / medium- / medium / medium+ / pronounced]
-Flavours: [list 4-6 specific flavour descriptors]
+Flavours: [4–6 plain-English descriptors — be specific, not generic]
 Finish: [short / medium- / medium / medium+ / long]
 
 ✅ CONCLUSIONS
@@ -169,23 +181,29 @@ Quality: [faulty / poor / acceptable / good / very good / outstanding]
 Readiness: [needs time / ready to drink / drink soon / past its best]
 
 🍽 PAIRS WITH
-[3-4 specific dishes, comma separated]
+[3–4 specific dishes — real dish names, not categories]
 
 🎉 BEST FOR
-[1 sentence: occasion or moment this wine suits]
+[1 sentence describing the occasion or moment this wine suits]
 
-Keep the whole card under 400 words.`;
+Rules:
+- Under 400 words total
+- Every descriptor must be something a non-expert can picture or taste
+- Use the exact WSET scale values — no paraphrasing them`;
 
-/** Generate a short WSET-style wine card (one Telegram message) */
+/** Generate a short WSET-style wine card (one Telegram message). Cached per region. */
 export async function generateWineCard(regionName: string): Promise<string> {
+  const cached = getCachedContent(regionName, 'card');
+  if (cached) return cached;
+
   const message = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 500,
+    max_tokens: 600,
     system: WINE_CARD_PROMPT,
     messages: [
       {
         role: 'user',
-        content: `Write a wine snapshot card for the ${regionName} wine region and its signature wine style.`,
+        content: `Write a WSET SAT tasting card for the ${regionName} wine region and its signature wine style.`,
       },
     ],
   });
@@ -195,13 +213,18 @@ export async function generateWineCard(regionName: string): Promise<string> {
     .map(b => (b as { type: 'text'; text: string }).text)
     .join('');
 
-  return `🍷 <b>${escapeHtml(regionName)}</b>\n─────────────────────\n\n${escapeHtml(raw.trim())}`;
+  const formatted = `🍷 <b>${escapeHtml(regionName)}</b>\n─────────────────────\n\n${escapeHtml(raw.trim())}`;
+  setCachedContent(regionName, 'card', formatted);
+  return formatted;
 }
 
 // ─── Public API ────────────────────────────────────────────────────────────
 
-/** Generate a deep-dive lesson for a wine region */
+/** Generate a deep-dive lesson for a wine region. Cached per region. */
 export async function generateRegionLesson(regionName: string): Promise<string[]> {
+  const cached = getCachedContent(regionName, 'lesson');
+  if (cached) return formatLessonForTelegram(cached, regionName);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stream = anthropic.messages.stream({
     model: MODEL,
@@ -210,7 +233,7 @@ export async function generateRegionLesson(regionName: string): Promise<string[]
     messages: [
       {
         role: 'user',
-        content: `Generate a comprehensive wine education lesson about the ${regionName} wine region. Follow the required structure exactly.`,
+        content: `Write a wine education lesson about the ${regionName} wine region. Follow the required structure exactly.`,
       },
     ],
   } as any);
@@ -221,11 +244,15 @@ export async function generateRegionLesson(regionName: string): Promise<string[]
     .map(b => (b as { type: 'text'; text: string }).text)
     .join('');
 
+  setCachedContent(regionName, 'lesson', raw);
   return formatLessonForTelegram(raw, regionName);
 }
 
-/** Generate a deep-dive lesson for a specific grape variety */
+/** Generate a deep-dive lesson for a specific grape variety. Cached per grape. */
 export async function generateGrapeLesson(grapeName: string): Promise<string[]> {
+  const cached = getCachedContent(grapeName, 'grape_lesson');
+  if (cached) return formatLessonForTelegram(cached, `${grapeName} — Grape Deep Dive`);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stream = anthropic.messages.stream({
     model: MODEL,
@@ -245,6 +272,7 @@ export async function generateGrapeLesson(grapeName: string): Promise<string[]> 
     .map(b => (b as { type: 'text'; text: string }).text)
     .join('');
 
+  setCachedContent(grapeName, 'grape_lesson', raw);
   return formatLessonForTelegram(raw, `${grapeName} — Grape Deep Dive`);
 }
 

@@ -43,6 +43,14 @@ db.exec(`
     telegram_id TEXT PRIMARY KEY,
     state       TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS lesson_cache (
+    region_name  TEXT NOT NULL,
+    cache_type   TEXT NOT NULL,
+    content      TEXT NOT NULL,
+    created_at   TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (region_name, cache_type)
+  );
 `);
 
 // Migrations for databases created before these columns were added
@@ -184,6 +192,26 @@ export function setUserState(telegramId: string, state: UserState): void {
 
 export function clearUserState(telegramId: string): void {
   stmtClearUserState.run(telegramId);
+}
+
+// ─── Lesson Cache Operations ────────────────────────────────────────────────
+
+const stmtGetCachedContent = db.prepare<[string, string], { content: string }>(
+  'SELECT content FROM lesson_cache WHERE region_name = ? AND cache_type = ?'
+);
+
+const stmtSetCachedContent = db.prepare(`
+  INSERT INTO lesson_cache (region_name, cache_type, content)
+  VALUES (?, ?, ?)
+  ON CONFLICT(region_name, cache_type) DO UPDATE SET content = excluded.content
+`);
+
+export function getCachedContent(regionName: string, cacheType: string): string | null {
+  return stmtGetCachedContent.get(regionName, cacheType)?.content ?? null;
+}
+
+export function setCachedContent(regionName: string, cacheType: string, content: string): void {
+  stmtSetCachedContent.run(regionName, cacheType, content);
 }
 
 export type { DatabaseType };
