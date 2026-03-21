@@ -1,5 +1,5 @@
 import TelegramBot from 'node-telegram-bot-api';
-import { getLessonCount, incrementLessonCount } from '../db';
+import { getLessonCount, incrementLessonCount, getUser } from '../db';
 import { getNextRegionForUser } from '../regions';
 import { generateRegionLesson, generateWineCard } from '../lessons';
 import { sendRegionMaps } from '../maps';
@@ -19,7 +19,8 @@ export async function deliverNextLesson(
   telegramId: string
 ): Promise<void> {
   const lessonCount = getLessonCount(telegramId);
-  const region = getNextRegionForUser(telegramId, lessonCount);
+  const regionOffset = getUser(telegramId)?.region_offset ?? 0;
+  const region = getNextRegionForUser(telegramId, lessonCount, regionOffset);
 
   await bot.sendChatAction(chatId, 'typing');
 

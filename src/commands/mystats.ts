@@ -14,7 +14,8 @@ export function handleMyStats(bot: TelegramBot, msg: TelegramBot.Message): void 
 
   const totalRegions = getAllRegions().length;
   const lessonsReceived = user.lesson_count ?? 0;
-  const covered = getRegionsCoveredByUser(telegramId, lessonsReceived);
+  const regionOffset = user.region_offset ?? 0;
+  const covered = getRegionsCoveredByUser(telegramId, lessonsReceived, regionOffset);
   const isSubscribed = user.subscribed === 1;
   const memberSince = user.created_at.split('T')[0] ?? user.created_at.slice(0, 10);
   const firstName = user.first_name ?? 'Wine Lover';
@@ -36,7 +37,7 @@ export function handleMyStats(bot: TelegramBot, msg: TelegramBot.Message): void 
 
   let statsText = `🍷 <b>Your Wine Journey — ${escapeHtml(firstName)}</b>\n\n`;
   statsText += `${progressBar} ${completionPct}%\n`;
-  statsText += `<b>Lessons received:</b> ${lessonsReceived} / ${totalRegions} regions\n`;
+  statsText += `<b>Lessons received:</b> ${Math.min(lessonsReceived, totalRegions)} / ${totalRegions} regions\n`;
   statsText += `<b>Member since:</b> ${memberSince}\n`;
   statsText += `<b>Daily lessons:</b> ${isSubscribed ? `✅ Active (9:00 AM ${escapeHtml(user.timezone)})` : '❌ Off — use /daily to subscribe'}\n`;
 

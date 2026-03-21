@@ -29,13 +29,14 @@ export function findRegionByName(query: string): Region | undefined {
 }
 
 /**
- * Returns the next region for a user based on their lesson count.
- * The order is a deterministic shuffle seeded by telegramId, so it is
- * consistent across restarts. Cycles back to the start after all 60 regions.
+ * Returns the next region for a user based on their lesson count and offset.
+ * The order is a deterministic shuffle seeded by telegramId. The regionOffset
+ * (set randomly at registration) shifts the starting position so new users
+ * don't all begin with the same region.
  */
-export function getNextRegionForUser(telegramId: string, lessonCount: number): Region {
+export function getNextRegionForUser(telegramId: string, lessonCount: number, regionOffset: number): Region {
   const shuffled = shuffleWithSeed(REGIONS, telegramId);
-  return shuffled[lessonCount % shuffled.length];
+  return shuffled[(lessonCount + regionOffset) % shuffled.length];
 }
 
 /**
@@ -69,9 +70,11 @@ function lcg(seed: number): number {
 
 /**
  * Returns the list of regions a user has already received lessons for,
- * reconstructed from their lesson count and the deterministic shuffle order.
+ * reconstructed from their lesson count, offset, and deterministic shuffle order.
  */
-export function getRegionsCoveredByUser(telegramId: string, lessonCount: number): Region[] {
+export function getRegionsCoveredByUser(telegramId: string, lessonCount: number, regionOffset: number): Region[] {
   const shuffled = shuffleWithSeed(REGIONS, telegramId);
-  return shuffled.slice(0, Math.min(lessonCount, shuffled.length));
+  const total = shuffled.length;
+  const count = Math.min(lessonCount, total);
+  return Array.from({ length: count }, (_, i) => shuffled[(i + regionOffset) % total]);
 }

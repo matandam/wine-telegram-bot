@@ -45,9 +45,10 @@ db.exec(`
   );
 `);
 
-// Migrations for databases created before lesson_count was added
+// Migrations for databases created before these columns were added
 try { db.exec(`ALTER TABLE users ADD COLUMN lesson_count INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE users ADD COLUMN last_lesson_at TEXT`); } catch {}
+try { db.exec(`ALTER TABLE users ADD COLUMN region_offset INTEGER DEFAULT 0`); } catch {}
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,7 @@ export interface User {
   created_at: string;
   lesson_count: number;
   last_lesson_at: string | null;
+  region_offset: number;
 }
 
 export interface UserState {
@@ -76,8 +78,8 @@ const stmtGetUser = db.prepare<[string], User>(
 );
 
 const stmtUpsertUser = db.prepare(`
-  INSERT INTO users (telegram_id, username, first_name)
-  VALUES (@telegram_id, @username, @first_name)
+  INSERT INTO users (telegram_id, username, first_name, region_offset)
+  VALUES (@telegram_id, @username, @first_name, @region_offset)
   ON CONFLICT(telegram_id) DO UPDATE SET
     username   = excluded.username,
     first_name = excluded.first_name
@@ -130,7 +132,10 @@ export function getUser(telegramId: string): User | undefined {
 }
 
 export function upsertUser(telegramId: string, username: string | null, firstName: string | null): void {
-  stmtUpsertUser.run({ telegram_id: telegramId, username, first_name: firstName });
+  // region_offset is set once on INSERT and never overwritten — gives each new user
+  // a random starting position in their lesson shuffle so the first lesson varies.
+  const regionOffset = Math.floor(Math.random() * 126);
+  stmtUpsertUser.run({ telegram_id: telegramId, username, first_name: firstName, region_offset: regionOffset });
 }
 
 export function updateUserTimezone(telegramId: string, timezone: string): void {
