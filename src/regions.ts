@@ -1,5 +1,4 @@
 import path from 'path';
-import { getUserLessonHistory } from './db';
 
 export interface Region {
   index: number;
@@ -30,24 +29,13 @@ export function findRegionByName(query: string): Region | undefined {
 }
 
 /**
- * Returns the next region index the user has not yet received,
- * cycling through regions in a shuffled order tied to the user.
- * Returns null when the user has received all 60 regions.
+ * Returns the next region for a user based on their lesson count.
+ * The order is a deterministic shuffle seeded by telegramId, so it is
+ * consistent across restarts. Cycles back to the start after all 60 regions.
  */
-export function getNextRegionForUser(telegramId: string): Region | null {
-  const delivered = new Set(getUserLessonHistory(telegramId));
-
-  // Shuffle regions with a stable seed derived from telegramId so the order
-  // is consistent across bot restarts but unique per user.
+export function getNextRegionForUser(telegramId: string, lessonCount: number): Region {
   const shuffled = shuffleWithSeed(REGIONS, telegramId);
-
-  for (const region of shuffled) {
-    if (!delivered.has(region.index)) {
-      return region;
-    }
-  }
-
-  return null; // user has received all regions
+  return shuffled[lessonCount % shuffled.length];
 }
 
 /**
@@ -80,11 +68,10 @@ function lcg(seed: number): number {
 }
 
 /**
- * Returns the list of region names a user has already received lessons for.
+ * Returns the list of regions a user has already received lessons for,
+ * reconstructed from their lesson count and the deterministic shuffle order.
  */
-export function getRegionsCoveredByUser(telegramId: string): Region[] {
-  const delivered = getUserLessonHistory(telegramId);
-  return delivered
-    .map(idx => getRegionByIndex(idx))
-    .filter((r): r is Region => r !== undefined);
+export function getRegionsCoveredByUser(telegramId: string, lessonCount: number): Region[] {
+  const shuffled = shuffleWithSeed(REGIONS, telegramId);
+  return shuffled.slice(0, Math.min(lessonCount, shuffled.length));
 }

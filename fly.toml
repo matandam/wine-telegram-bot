@@ -1,0 +1,11 @@
+app = "wine-telegram-bot"
+primary_region = "ams"
+
+[build]
+
+[env]
+  NODE_ENV = "production"
+
+[[mounts]]
+  source = "wine_bot_data"
+  destination = "/app/data"

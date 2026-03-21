@@ -2,7 +2,12 @@ import Database, { Database as DatabaseType } from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'wine_bot.db');
+// Prefer /app/data on Railway (volume mount), fall back to local data/
+const DEFAULT_PATH = fs.existsSync('/app/data')
+  ? '/app/data/wine_bot.db'
+  : path.join(__dirname, '..', 'data', 'wine_bot.db');
+
+const DB_PATH = process.env.DB_PATH || DEFAULT_PATH;
 
 // Ensure data directory exists
 const dataDir = path.dirname(DB_PATH);
@@ -11,8 +16,7 @@ if (!fs.existsSync(dataDir)) {
 }
 
 console.log(`[db] Using database at: ${DB_PATH}`);
-console.log(`[db] __dirname: ${__dirname}`);
-console.log(`[db] DB_PATH env: ${process.env.DB_PATH || '(not set)'}`);
+console.log(`[db] DB_PATH env: ${process.env.DB_PATH || '(not set, using default)'}`);
 
 const db: DatabaseType = new Database(DB_PATH);
 
@@ -24,21 +28,15 @@ db.pragma('foreign_keys = ON');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    telegram_id TEXT    UNIQUE NOT NULL,
-    username    TEXT,
-    first_name  TEXT,
-    subscribed  INTEGER DEFAULT 0,
-    timezone    TEXT    DEFAULT 'UTC',
-    created_at  TEXT    DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS lesson_history (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    telegram_id  TEXT    NOT NULL,
-    region_index INTEGER NOT NULL,
-    delivered_at TEXT    DEFAULT (datetime('now')),
-    UNIQUE(telegram_id, region_index)
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    telegram_id    TEXT    UNIQUE NOT NULL,
+    username       TEXT,
+    first_name     TEXT,
+    subscribed     INTEGER DEFAULT 0,
+    timezone       TEXT    DEFAULT 'UTC',
+    created_at     TEXT    DEFAULT (datetime('now')),
+    lesson_count   INTEGER DEFAULT 0,
+    last_lesson_at TEXT
   );
 
   CREATE TABLE IF NOT EXISTS user_state (
@@ -46,6 +44,10 @@ db.exec(`
     state       TEXT NOT NULL
   );
 `);
+
+// Migrations for databases created before lesson_count was added
+try { db.exec(`ALTER TABLE users ADD COLUMN lesson_count INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE users ADD COLUMN last_lesson_at TEXT`); } catch {}
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -57,6 +59,8 @@ export interface User {
   subscribed: number;
   timezone: string;
   created_at: string;
+  lesson_count: number;
+  last_lesson_at: string | null;
 }
 
 export interface UserState {
@@ -91,23 +95,19 @@ const stmtGetAllSubscribed = db.prepare<[], User>(
   'SELECT * FROM users WHERE subscribed = 1'
 );
 
-const stmtAddLessonHistory = db.prepare(`
-  INSERT OR IGNORE INTO lesson_history (telegram_id, region_index)
-  VALUES (?, ?)
+const stmtGetLessonCount = db.prepare<[string], { lesson_count: number }>(
+  'SELECT lesson_count FROM users WHERE telegram_id = ?'
+);
+
+const stmtIncrementLessonCount = db.prepare(`
+  UPDATE users SET lesson_count = lesson_count + 1, last_lesson_at = datetime('now')
+  WHERE telegram_id = ?
 `);
 
-const stmtGetUserLessonHistory = db.prepare<[string], { region_index: number }>(
-  'SELECT region_index FROM lesson_history WHERE telegram_id = ?'
-);
-
-const stmtGetUserLessonCount = db.prepare<[string], { count: number }>(
-  'SELECT COUNT(*) as count FROM lesson_history WHERE telegram_id = ?'
-);
-
 const stmtHasRecentLesson = db.prepare<[string, number], { count: number }>(`
-  SELECT COUNT(*) as count FROM lesson_history
+  SELECT COUNT(*) as count FROM users
   WHERE telegram_id = ?
-  AND delivered_at > datetime('now', '-' || ? || ' hours')
+  AND last_lesson_at > datetime('now', '-' || ? || ' hours')
 `);
 
 const stmtGetUserState = db.prepare<[string], { state: string }>(
@@ -145,19 +145,15 @@ export function getAllSubscribedUsers(): User[] {
   return stmtGetAllSubscribed.all();
 }
 
-// ─── Lesson History Operations ─────────────────────────────────────────────
+// ─── Lesson Count Operations ────────────────────────────────────────────────
 
-export function addLessonHistory(telegramId: string, regionIndex: number): void {
-  stmtAddLessonHistory.run(telegramId, regionIndex);
+export function getLessonCount(telegramId: string): number {
+  const row = stmtGetLessonCount.get(telegramId);
+  return row?.lesson_count ?? 0;
 }
 
-export function getUserLessonHistory(telegramId: string): number[] {
-  return stmtGetUserLessonHistory.all(telegramId).map(r => r.region_index);
-}
-
-export function getUserLessonCount(telegramId: string): number {
-  const row = stmtGetUserLessonCount.get(telegramId);
-  return row?.count ?? 0;
+export function incrementLessonCount(telegramId: string): void {
+  stmtIncrementLessonCount.run(telegramId);
 }
 
 export function hasRecentLesson(telegramId: string, hoursAgo: number = 20): boolean {

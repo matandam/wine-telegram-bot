@@ -1,0 +1,12 @@
+[build]
+builder = "nixpacks"
+buildCommand = "npm install && npm run build"
+
+[deploy]
+startCommand = "npm start"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# Volume persistence: add a Railway volume in the dashboard and mount it at /app/data
+# The bot detects this path automatically and stores wine_bot.db there.
+# Without a volume, the DB resets on every redeploy.

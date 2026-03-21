@@ -1,5 +1,5 @@
 import TelegramBot from 'node-telegram-bot-api';
-import { getUser, getUserLessonCount } from '../db';
+import { getUser } from '../db';
 import { getRegionsCoveredByUser, getAllRegions } from '../regions';
 
 export function handleMyStats(bot: TelegramBot, msg: TelegramBot.Message): void {
@@ -13,8 +13,8 @@ export function handleMyStats(bot: TelegramBot, msg: TelegramBot.Message): void 
   }
 
   const totalRegions = getAllRegions().length;
-  const lessonsReceived = getUserLessonCount(telegramId);
-  const covered = getRegionsCoveredByUser(telegramId);
+  const lessonsReceived = user.lesson_count ?? 0;
+  const covered = getRegionsCoveredByUser(telegramId, lessonsReceived);
   const isSubscribed = user.subscribed === 1;
   const memberSince = user.created_at.split('T')[0] ?? user.created_at.slice(0, 10);
   const firstName = user.first_name ?? 'Wine Lover';
@@ -46,7 +46,7 @@ export function handleMyStats(bot: TelegramBot, msg: TelegramBot.Message): void 
     statsText += '\n\n<i>No regions explored yet. Use /lesson to start!</i>';
   }
 
-  if (lessonsReceived === totalRegions) {
+  if (lessonsReceived >= totalRegions) {
     statsText += '\n\n🏆 <b>You\'ve completed all 60 regions. Extraordinary!</b>';
   } else {
     const remaining = totalRegions - lessonsReceived;

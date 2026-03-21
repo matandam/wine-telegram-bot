@@ -1,5 +1,5 @@
 import TelegramBot from 'node-telegram-bot-api';
-import { addLessonHistory } from '../db';
+import { getLessonCount, incrementLessonCount } from '../db';
 import { getNextRegionForUser } from '../regions';
 import { generateRegionLesson, generateWineCard } from '../lessons';
 import { sendRegionMaps } from '../maps';
@@ -18,16 +18,8 @@ export async function deliverNextLesson(
   chatId: number,
   telegramId: string
 ): Promise<void> {
-  const region = getNextRegionForUser(telegramId);
-
-  if (!region) {
-    await bot.sendMessage(
-      chatId,
-      '🏆 <b>Incredible — you\'ve completed all 60 regions!</b>\n\nYou\'ve received lessons for every wine region in my curriculum. Use /region or /grape for specific deep dives anytime.',
-      { parse_mode: 'HTML' }
-    );
-    return;
-  }
+  const lessonCount = getLessonCount(telegramId);
+  const region = getNextRegionForUser(telegramId, lessonCount);
 
   await bot.sendChatAction(chatId, 'typing');
 
@@ -59,7 +51,7 @@ export async function deliverNextLesson(
   });
 
   // Record delivery now (card counts as delivery)
-  addLessonHistory(telegramId, region.index);
+  incrementLessonCount(telegramId);
 }
 
 /**
