@@ -41,6 +41,10 @@ export function handleMyStats(bot: TelegramBot, msg: TelegramBot.Message): void 
   statsText += `<b>Member since:</b> ${memberSince}\n`;
   statsText += `<b>Daily lessons:</b> ${isSubscribed ? `✅ Active (9:00 AM ${escapeHtml(user.timezone)})` : '❌ Off — use /daily to subscribe'}\n`;
 
+  if (user.pref_color) {
+    statsText += `<b>Last recommendation:</b> ${escapeHtml(user.pref_color)} · ${escapeHtml(user.pref_style ?? '')} · ${escapeHtml(user.pref_occasion ?? '')}\n`;
+  }
+
   if (covered.length > 0) {
     statsText += `\n<b>Regions explored:</b>\n${countryLines}`;
   } else {

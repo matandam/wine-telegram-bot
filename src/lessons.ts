@@ -395,42 +395,97 @@ export async function generateBonusLesson(title: string, description: string, ca
   return formatLessonForTelegram(raw, title);
 }
 
-/** Generate a personalised wine style recommendation */
+// ─── Recommendation Prompt ──────────────────────────────────────────────────
+
+const RECOMMENDATION_PROMPT = `You are a wine recommender who writes like Wine Folly — direct, specific, and completely unpretentious. You receive three user preferences (color, style, occasion) and output exactly 3 bottle recommendations.
+
+Follow this EXACT format with NO extra text, no markdown, plain text only:
+
+[One punchy hook sentence: why this combination of preferences points to a specific wine. Opinionated. Not poetic.]
+
+💚 [Producer — Wine Name]
+[One tasting note in plain English — what it smells and tastes like, no jargon]
+[One sentence: why it fits this color + style + occasion]
+
+💛 [Producer — Wine Name]
+[tasting note]
+[fit reason]
+
+🔴 [Producer — Wine Name]
+[tasting note]
+[fit reason]
+
+🍽 PAIRS WITH
+[3 specific dish names, comma-separated]
+
+💡 WHY THESE WORK
+[One sentence connecting the preference logic to the recommendation]
+
+Price emoji rules: 💚 = under $25 | 💛 = $25–70 | 🔴 = $70+
+Rules:
+- Exactly 3 bottles, one per price tier where possible
+- Under 350 words total
+- Every tasting note must use plain English — no "minerality", no "terroir-driven", no "complex"
+- Real producers, real wine names that actually exist`;
+
+/** Generate a personalised wine recommendation. Cached per (color, style, occasion) combo. */
 export async function generateRecommendation(prefs: {
   color: string;
   style: string;
   occasion: string;
 }): Promise<string[]> {
-  const stream = anthropic.messages.stream({
+  const cacheKey = `${prefs.color}|${prefs.style}|${prefs.occasion}`;
+  const cached = getCachedContent(cacheKey, 'recommendation');
+  if (cached) return splitMessage(cached, 4000);
+
+  const message = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 2048,
-    system: WINE_SYSTEM_PROMPT,
+    max_tokens: 600,
+    system: RECOMMENDATION_PROMPT,
     messages: [
       {
         role: 'user',
-        content: `Based on the following preferences, recommend a specific wine style and 2–3 specific bottles:
-• Color preference: ${prefs.color}
-• Style preference: ${prefs.style}
-• Occasion: ${prefs.occasion}
-
-Provide:
-1. The recommended wine style/region and why it fits these preferences
-2. 2–3 specific bottle recommendations with producer name, wine name, and price tier (Entry / Mid-range / Premium)
-3. A brief tasting note for each bottle
-4. One food pairing suggestion
-
-Keep the response focused and actionable. No general chat — pure wine recommendation content.`,
+        content: `Color: ${prefs.color}\nStyle: ${prefs.style}\nOccasion: ${prefs.occasion}`,
       },
     ],
   });
 
-  const message = await stream.finalMessage();
   const raw = message.content
     .filter(b => b.type === 'text')
     .map(b => (b as { type: 'text'; text: string }).text)
     .join('');
 
-  const header = `🍾 <b>Your Personalised Wine Recommendation</b>\n\n`;
-  const body = escapeHtml(raw);
+  setCachedContent(cacheKey, 'recommendation', raw);
+
+  const header = `🍾 <b>Your Personalised Wine Recommendation</b>\n─────────────────────\n\n`;
+  const body = escapeHtml(raw.trim());
+  return splitMessage(header + body, 4000);
+}
+
+/** Generate a fresh recommendation for the same preferences (bypasses cache). */
+export async function generateFreshRecommendation(prefs: {
+  color: string;
+  style: string;
+  occasion: string;
+}): Promise<string[]> {
+  const message = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 600,
+    system: RECOMMENDATION_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: `Color: ${prefs.color}\nStyle: ${prefs.style}\nOccasion: ${prefs.occasion}\n\nGive me different bottles from last time.`,
+      },
+    ],
+  });
+
+  const raw = message.content
+    .filter(b => b.type === 'text')
+    .map(b => (b as { type: 'text'; text: string }).text)
+    .join('');
+
+  const header = `🍾 <b>Your Personalised Wine Recommendation</b>\n─────────────────────\n\n`;
+  const body = escapeHtml(raw.trim());
   return splitMessage(header + body, 4000);
 }

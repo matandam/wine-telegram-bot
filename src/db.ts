@@ -57,6 +57,9 @@ db.exec(`
 try { db.exec(`ALTER TABLE users ADD COLUMN lesson_count INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE users ADD COLUMN last_lesson_at TEXT`); } catch {}
 try { db.exec(`ALTER TABLE users ADD COLUMN region_offset INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE users ADD COLUMN pref_color TEXT`); } catch {}
+try { db.exec(`ALTER TABLE users ADD COLUMN pref_style TEXT`); } catch {}
+try { db.exec(`ALTER TABLE users ADD COLUMN pref_occasion TEXT`); } catch {}
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -71,6 +74,9 @@ export interface User {
   lesson_count: number;
   last_lesson_at: string | null;
   region_offset: number;
+  pref_color: string | null;
+  pref_style: string | null;
+  pref_occasion: string | null;
 }
 
 export interface UserState {
@@ -172,6 +178,14 @@ export function incrementLessonCount(telegramId: string): void {
 export function hasRecentLesson(telegramId: string, hoursAgo: number = 20): boolean {
   const row = stmtHasRecentLesson.get(telegramId, hoursAgo);
   return (row?.count ?? 0) > 0;
+}
+
+const stmtSaveUserPreferences = db.prepare(
+  'UPDATE users SET pref_color = ?, pref_style = ?, pref_occasion = ? WHERE telegram_id = ?'
+);
+
+export function saveUserPreferences(telegramId: string, color: string, style: string, occasion: string): void {
+  stmtSaveUserPreferences.run(color, style, occasion, telegramId);
 }
 
 // ─── User State Operations ─────────────────────────────────────────────────

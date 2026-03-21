@@ -11,7 +11,7 @@ import { handleStop } from './commands/stop';
 import { handleLesson, handleFullLessonCallback, handleFullBonusCallback } from './commands/lesson';
 import { handleRegion } from './commands/region';
 import { handleGrape } from './commands/grape';
-import { handleRecommend, handleRecommendReply } from './commands/recommend';
+import { handleRecommend, handleRecommendReply, handleRecommendCallback } from './commands/recommend';
 import { handleMyStats } from './commands/mystats';
 
 // ─── Env validation ────────────────────────────────────────────────────────
@@ -135,6 +135,8 @@ bot.on('callback_query', async (query) => {
     await handleFullLessonCallback(bot, query);
   } else if (query.data?.startsWith('full_bonus:')) {
     await handleFullBonusCallback(bot, query);
+  } else if (query.data?.startsWith('rec_restart:') || query.data?.startsWith('rec_different:')) {
+    await handleRecommendCallback(bot, query);
   } else {
     await bot.answerCallbackQuery(query.id);
   }
